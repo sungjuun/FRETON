@@ -1,0 +1,25 @@
+import { test, expect } from '@playwright/test'
+test('실제 OfflineAudioContext에서 기본 DSP를 렌더한다', async ({ page }) => {
+  await page.goto('/')
+  const results = await page.evaluate(async () => {
+    // Vite resolves the same TypeScript workspace sources used by the application.
+    return await (await import(/* @vite-ignore */ '/tests/offline-check.ts' as string)).verify()
+  })
+  console.log('OfflineAudioContext', JSON.stringify(results))
+  expect(results.validSignals).toBe(true)
+  expect(results.gain).toBeCloseTo(2, 1)
+  expect(results.dryError).toBeLessThan(0.001)
+  expect(results.bass).toBeGreaterThan(2)
+  expect(results.harmonics).toBeGreaterThan(0.02)
+  expect(results.overdriveThird).toBeGreaterThan(0.02)
+  expect(results.drySpanDb).toBeCloseTo(18.06, 1)
+  expect(results.compressorSpanDb).toBeGreaterThan(0)
+  expect(results.compressorSpanDb).toBeLessThan(6)
+  expect(results.echo).toBeGreaterThan(0.02)
+  expect(results.room).toBeGreaterThan(0.00001)
+  expect(results.distinct).toBe(6)
+  expect(results.safe).toBe(true)
+  expect(results.cabinetImpulse).toBeGreaterThan(0.001)
+  expect(Math.abs(results.cabinetDirect)).toBeLessThan(0.00001)
+  expect(results.protected).toBe(true)
+})
