@@ -12,4 +12,6 @@
 | 0.7.0 | Community & Cloud | 공유, 프로필과 콘텐츠 저장                                                                                                                          |
 | 1.0.0 | 공개 출시         | 실사용 성능·접근성·개인정보·콘텐츠 권리와 운영 준비 검토                                                                                            |
 
-0.1.0 개발 중 체인 순서 편집과 프리셋 마이그레이션을 구현하고 Chrome에서 실시간 신호와 Wet WAV를 비교했다. 소프트웨어 후속 작업은 Noise Gate, Chorus, Tremolo와 모델 목록이다. 실제 USB 경로의 물리 지연, 직접음 분리, 순서를 바꿀 때의 청감과 장시간 부하는 QME-50에서 확인한다. [소프트웨어 검증](../testing/software-test.md) · [실기기 검증표](../testing/hardware-test.md)
+0.1.0에서 체인 순서 편집, Noise Gate·Chorus·Tremolo와 프리셋 마이그레이션을 구현하고 Chrome에서 실시간 신호와 Wet WAV를 비교했다. Virtual Rig와 Audio Sandbox는 로컬 NAM 모델을 목록에 저장하고 새 세션의 프리셋에 다시 연결한다. Virtual Rig에서 키보드로 입력·프리셋·모델을 바꾸고, 재생 중 모델 복구와 Dry·전체 Bypass의 출력을 검증했다.
+
+다음 작업은 동일한 연주 입력으로 NAM 모델별 요구 샘플레이트와 처리 부하를 측정하는 것이다. USB 경로의 물리 지연, 직접음 분리, 체인 전환음과 장시간 연주는 QME-50에서 확인한다. [소프트웨어 검증](../testing/software-test.md) · [실기기 검증표](../testing/hardware-test.md)

@@ -8,7 +8,18 @@ import {
   type Settings,
 } from '../presets/config'
 import { impulseResponse } from '../inputs/signals'
+import noiseGateUrl from './noise-gate.worklet.js?url&no-inline'
+export async function registerNoiseGate(ctx: BaseAudioContext) {
+  if (!ctx.audioWorklet)
+    throw Error('이 브라우저에서 Noise Gate의 AudioWorklet을 사용할 수 없습니다.')
+  try {
+    await ctx.audioWorklet.addModule(noiseGateUrl)
+  } catch (cause) {
+    throw Error('Noise Gate 워크릿을 불러올 수 없습니다.', { cause })
+  }
+}
 const rampSeconds = 0.008
+export const chorusBaseDelayMs = 15
 export function smooth(p: AudioParam, value: number, ctx: BaseAudioContext, initial = false) {
   if (initial) {
     p.value = value
@@ -69,12 +80,19 @@ export class DspGraph {
   private transition?: ConstantSourceNode
   private nodes: AudioNode[] = []
   private gain: GainNode
+  private noiseGate?: AudioWorkletNode
+  private gateFailed = false
+  get noiseGateReady() {
+    return this.gateRegistered && !this.gateFailed
+  }
   private compressor: DynamicsCompressorNode
   private shapers: Record<
     'overdrive' | 'distortion',
     { pre: GainNode; filter: BiquadFilterNode; post: GainNode }
   >
   private filters: BiquadFilterNode[]
+  private chorus?: { lfo: OscillatorNode; depth: GainNode }
+  private tremoloLfo?: OscillatorNode
   private echo: DelayNode
   private feedback: GainNode
   private room: ConvolverNode
@@ -84,6 +102,8 @@ export class DspGraph {
     private ctx: BaseAudioContext,
     settings: Settings,
     order: readonly ChainStage[] = defaultOrder,
+    private gateRegistered = false,
+    private onGateError?: (error: Error) => void,
   ) {
     assertChainOrder(order)
     const track = <T extends AudioNode>(n: T) => {
@@ -206,10 +226,12 @@ export class DspGraph {
         old = this.previous?.[id],
         v = m.values
       if (old === m && !initial) continue
-      this.paths[id].mix(
-        m.enabled ? (id === 'delay' || id === 'reverb' ? v.mix / 100 : 1) : 0,
-        initial,
-      )
+      if (id === 'noiseGate') {
+        this.updateNoiseGate(m, initial)
+        continue
+      }
+      const wetPercent = id === 'tremolo' ? v.depth : (v.mix ?? 100)
+      this.paths[id].mix(m.enabled ? wetPercent / 100 : 0, initial)
       switch (id) {
         case 'input':
           apply(this.gain.gain, dbToGain(v.gain))
@@ -232,6 +254,12 @@ export class DspGraph {
         case 'eq':
           this.filters.forEach((f, i) => apply(f.gain, v[['bass', 'middle', 'treble'][i]]))
           break
+        case 'chorus':
+          if (m.enabled) this.updateChorus(v.rate, v.depth, initial)
+          break
+        case 'tremolo':
+          if (m.enabled) this.updateTremolo(v.rate, initial)
+          break
         case 'delay':
           apply(this.echo.delayTime, v.time / 1000)
           apply(this.feedback.gain, v.feedback / 100)
@@ -242,6 +270,66 @@ export class DspGraph {
       }
     }
     this.previous = settings
+  }
+  private updateNoiseGate(module: Settings['noiseGate'], initial: boolean) {
+    const path = this.paths.noiseGate
+    const enabled = module.enabled && this.noiseGateReady
+    if (enabled && !this.noiseGate) {
+      const node = new AudioWorkletNode(this.ctx, 'freton-noise-gate', {
+        parameterData: module.values,
+      })
+      this.noiseGate = node
+      path.send.connect(node).connect(path.receive)
+      node.onprocessorerror = () => {
+        this.gateFailed = true
+        path.mix(0)
+        this.onGateError?.(
+          Error('Noise Gate 처리 오류로 게이트를 우회했습니다. 엔진을 재시작하세요.'),
+        )
+      }
+    }
+    if (enabled && this.noiseGate) {
+      for (const [key, value] of Object.entries(module.values))
+        smooth(this.noiseGate.parameters.get(key)!, value, this.ctx, initial)
+    }
+    path.mix(enabled ? 1 : 0, initial)
+  }
+  private updateChorus(rate: number, depthMs: number, initial: boolean) {
+    if (!this.chorus) {
+      const path = this.paths.chorus
+      const delay = this.ctx.createDelay(0.05)
+      delay.delayTime.value = chorusBaseDelayMs / 1000
+      const lfo = this.ctx.createOscillator(),
+        depth = this.ctx.createGain()
+      lfo.frequency.value = rate
+      depth.gain.value = depthMs / 1000
+      path.send.connect(delay).connect(path.receive)
+      lfo.connect(depth).connect(delay.delayTime)
+      this.nodes.push(lfo, depth, delay)
+      this.chorus = { lfo, depth }
+      lfo.start()
+      return
+    }
+    smooth(this.chorus.lfo.frequency, rate, this.ctx, initial)
+    smooth(this.chorus.depth.gain, depthMs / 1000, this.ctx, initial)
+  }
+  private updateTremolo(rate: number, initial: boolean) {
+    if (this.tremoloLfo) {
+      smooth(this.tremoloLfo.frequency, rate, this.ctx, initial)
+      return
+    }
+    const lfo = this.ctx.createOscillator()
+    const amplitude = this.ctx.createGain(),
+      wet = this.ctx.createGain()
+    // The wet gain spans 0..1. Mixing it with the direct path sets the requested depth.
+    amplitude.gain.value = 0.5
+    wet.gain.value = 0.5
+    lfo.frequency.value = rate
+    lfo.connect(amplitude).connect(wet.gain)
+    this.paths.tremolo.send.connect(wet).connect(this.paths.tremolo.receive)
+    this.nodes.push(lfo, amplitude, wet)
+    this.tremoloLfo = lfo
+    lfo.start()
   }
   setIR(buffer: AudioBuffer | null, enabled: boolean, initial = false) {
     if (this.ir.buffer !== buffer) this.ir.buffer = buffer
@@ -259,6 +347,14 @@ export class DspGraph {
     )
   }
   dispose() {
+    this.chorus?.lfo.stop()
+    this.tremoloLfo?.stop()
+    if (this.noiseGate) {
+      this.noiseGate.onprocessorerror = null
+      this.noiseGate.port.postMessage('stop')
+      this.noiseGate.port.close()
+      this.noiseGate.disconnect()
+    }
     if (this.transition) {
       this.transition.onended = null
       this.transition = undefined

@@ -5,6 +5,7 @@ test('합성 MediaStream의 좌우 채널, 모니터 음소거, 트랙 해제와
 }) => {
   await page.goto('/sandbox')
   await page.getByRole('button', { name: '엔진 시작', exact: true }).click()
+  await expect(page.getByText('엔진 실행 중', { exact: true })).toBeVisible()
   const r = await page.evaluate(async () => {
     const e: AudioEngine = (await import(/* @vite-ignore */ '/src/studio.ts' as string)).engine
     const ctx = e.ctx!,

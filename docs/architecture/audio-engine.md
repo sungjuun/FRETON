@@ -5,14 +5,14 @@
 ```text
 FileInput / LiveInput / TestSignalInput
   → 소스 레벨 → 입력 Analyser
-  → Input Gain → Compressor → Overdrive → Distortion → NAM → Cabinet IR
-  → 3-band EQ → Delay → Reverb
+  → Input Gain → Noise Gate → Compressor → Overdrive → Distortion → NAM → Cabinet IR
+  → 3-band EQ → Chorus → Tremolo → Delay → Reverb
   → Master·Mute → 출력 보호 → 출력 Analyser → 출력 장치
 ```
 
-합성 기타도 TestSignalInput을 이용한다. 전체 Dry 경로는 첫 이펙터 앞에서 분기하고 Master 직전에 합류한다. Dry와 Wet에 같은 소스 레벨·Master·보호단을 적용한다. 개별 바이패스는 병렬 경로의 두 게인을 8 ms에 걸쳐 반대로 램핑한다. 딜레이와 리버브는 동일한 구조로 드라이/처리 비율을 제어한다.
+합성 기타도 TestSignalInput을 이용한다. 전체 Dry 경로는 첫 이펙터 앞에서 분기하고 Master 직전에 합류한다. Dry와 Wet에 같은 소스 레벨·Master·보호단을 적용한다. 개별 바이패스는 병렬 경로의 두 게인을 8 ms에 걸쳐 반대로 램핑한다. 코러스·딜레이·리버브는 동일한 구조로 드라이/처리 비율을 제어한다.
 
-Input Gain과 Master 사이의 여덟 슬롯은 프리셋의 `order` 순서로 연결한다. 실행 중에는 Wet 게인을 8 ms 동안 내리고 오디오 시계의 종료 이벤트에서 슬롯 사이의 연결을 교체한 뒤 8 ms 동안 올린다. 이벤트를 기다리는 동안 들어온 순서 편집은 마지막 값으로 합친다. 오프라인 엔진과 새로 시작한 엔진은 처음부터 선택한 순서로 연결한다. [ADR 0004](../adr/0004-editable-signal-chain.md)
+Input Gain과 Master 사이의 열한 슬롯은 프리셋의 `order` 순서로 연결한다. 실행 중에는 Wet 게인을 8 ms 동안 내리고 오디오 시계의 종료 이벤트에서 슬롯 사이의 연결을 교체한 뒤 8 ms 동안 올린다. 이벤트를 기다리는 동안 들어온 순서 편집은 마지막 값으로 합친다. 오프라인 엔진과 새로 시작한 엔진은 처음부터 선택한 순서로 연결한다. [ADR 0004](../adr/0004-editable-signal-chain.md)
 
 ## 수명과 전환
 
@@ -26,4 +26,4 @@ Input Gain과 Master 사이의 여덟 슬롯은 프리셋의 `order` 순서로 �
 
 실시간 미터는 2048 샘플 분석 창에서 최대 20 Hz로 Peak와 RMS를 읽는다. 스펙트럼은 동일 Analyser의 주파수 빈을 표시한다. 분석기는 브라우저가 혼합한 채널을 보여준다. 순간적인 모든 피크를 포착하는 전용 멀티채널 true-peak 계측기는 후속 과제다.
 
-오프라인 렌더는 현재 엔진 샘플레이트의 OfflineAudioContext에 같은 DspGraph를 생성한다. 초기값은 램핑 없이 지정하고 IR·Delay·Reverb의 꼬리를 포함한다. 실시간 청취용 Mute는 파일 생성에 적용하지 않는다. 출력 진폭과 렌더 메모리 한도는 [DSP 사양](../audio/dsp-effects.md)을 따른다.
+오프라인 렌더는 현재 엔진 샘플레이트의 OfflineAudioContext에 같은 DspGraph를 생성한다. 초기값은 램핑 없이 지정하고 Chorus·IR·Delay·Reverb의 꼬리를 포함한다. 실시간 청취용 Mute는 파일 생성에 적용하지 않는다. 출력 진폭과 렌더 메모리 한도는 [DSP 사양](../audio/dsp-effects.md)을 따른다.

@@ -53,6 +53,7 @@ button:hover,
   filter: brightness(1.16);
 }
 button:disabled,
+button[aria-disabled='true'],
 .disabled {
   opacity: 0.43;
   cursor: default;
@@ -450,6 +451,8 @@ main {
 }
 .amp-foot > span {
   margin-right: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--muted);
   font-size: 0.84rem;
 }
@@ -485,7 +488,7 @@ main {
 }
 .pedalboard {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
   gap: clamp(5px, 1vw, 16px);
   padding: 16px clamp(10px, 1.5vw, 22px);
   background: repeating-linear-gradient(0deg, #1b1e23 0 5px, #1a1d21 6px 8px);
@@ -922,6 +925,11 @@ dialog::backdrop {
 .warning {
   color: #e1bc8c;
   background: #322c23;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+.warning a {
+  text-decoration: underline;
 }
 .planned {
   text-align: center;
@@ -1094,7 +1102,6 @@ dialog::backdrop {
     height: 36px;
   }
   .preset-symbol,
-  .amp-foot > span,
   .crumb > svg:first-child,
   .statusbar > span:nth-child(2) {
     display: none;
@@ -1116,6 +1123,10 @@ dialog::backdrop {
   }
   .amp-foot {
     justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .amp-foot > span {
+    width: 100%;
   }
   .statusbar {
     padding-inline: 6px;

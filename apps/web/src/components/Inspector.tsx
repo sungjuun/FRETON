@@ -1,7 +1,9 @@
-import { SlidersHorizontal, Activity, Cpu, Box, Trash2, AudioLines } from 'lucide-react'
+import { useState } from 'react'
+import { SlidersHorizontal, Activity, Cpu, Box, Trash2, AudioLines, Library } from 'lucide-react'
 import { modules, moduleIds, parameters } from '@freton/audio-engine'
 import { useEngine, useStudio, setParameter, toggleModule, execute, sourceNames } from '../studio'
 import { Toggle, Range, FilePick } from './Controls'
+import { NamLibrary } from './NamLibrary'
 export function Inspector() {
   const e = useEngine(),
     { selected, select } = useStudio(),
@@ -37,6 +39,11 @@ export function Inspector() {
           <Toggle label="이펙터 활성화" value={m.enabled} change={() => toggleModule(selected)} />
         </div>
         <div className="knob-list">
+          {selected === 'noiseGate' && (
+            <small>
+              Threshold에서 게이트가 열립니다. 음 끝이 짧으면 Hold나 Release를 늘려 보세요.
+            </small>
+          )}
           {Object.entries(parameters(selected)).map(([key, p]) => (
             <Range
               key={key}
@@ -56,6 +63,7 @@ export function Inspector() {
 }
 export function ModelRack() {
   const e = useEngine()
+  const [libraryOpen, setLibraryOpen] = useState(false)
   return (
     <section className="panel rack">
       <header className="panel-head">
@@ -84,12 +92,23 @@ export function ModelRack() {
                     : ref
                       ? loaded
                         ? ref.name
-                        : '파일 재선택 필요'
+                        : nam
+                          ? '모델 다시 연결 필요'
+                          : '파일 재선택 필요'
                       : '파일 미로드'}
                 </small>
               </span>
             </summary>
             <div className="stack rack-fields">
+              {nam && (
+                <button
+                  id="nam-library-button"
+                  aria-haspopup="dialog"
+                  onClick={() => setLibraryOpen(true)}
+                >
+                  <Library /> NAM 모델 라이브러리
+                </button>
+              )}
               <FilePick
                 label={missing ? label + ' 원본 다시 연결' : nam ? 'NAM 파일 선택' : 'IR WAV 선택'}
                 accept={nam ? '.nam' : '.wav'}
@@ -162,6 +181,7 @@ export function ModelRack() {
           </details>
         )
       })}
+      {libraryOpen && <NamLibrary close={() => setLibraryOpen(false)} />}
       {e.preset.nam?.enabled && e.preset.nam.capture === 'full' && e.preset.ir?.enabled && (
         <p className="note">
           이 프리셋은 캐비닛 포함 캡처와 별도 IR을 함께 사용하도록 설정되어 있습니다.

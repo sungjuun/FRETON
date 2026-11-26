@@ -1,3 +1,12 @@
+import type { Page } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
+
+export async function downloadFile(page: Page, label: string) {
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: label, exact: true }).click()
+  return readFile((await (await download).path())!)
+}
+
 export function audioWav(rate = 44100, channels = 1, frequency = 220) {
   const frames = Math.floor(rate / 2),
     bytes = frames * 2 * channels,

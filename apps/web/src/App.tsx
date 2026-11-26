@@ -108,7 +108,7 @@ function Workspace() {
     e = useEngine(),
     { dialog, open } = useStudio()
   const [folded, setFolded] = useState(false),
-    [dismissed, setDismissed] = useState<string>()
+    [dismissed, setDismissed] = useState<string[]>()
   useEffect(() => {
     execute(refreshPresets)
     const close = () => {
@@ -197,19 +197,30 @@ function Workspace() {
               <p>{current.desc}</p>
             </div>
           </div>
-          {e.errors[0] && dismissed !== e.errors[0] && (
+          {e.errors[0] && dismissed !== e.errors && (
             <div className="error-banner" role="alert">
               {e.errors[0]}
-              <button aria-label="오류 닫기" onClick={() => setDismissed(e.errors[0])}>
+              <button aria-label="오류 닫기" onClick={() => setDismissed(e.errors)}>
                 <X />
               </button>
             </div>
+          )}
+          {e.preset.settings.noiseGate.enabled && e.graph?.noiseGateReady === false && (
+            <p className="warning">Noise Gate가 바이패스 중입니다. 엔진을 재시작하세요.</p>
           )}
           {(['nam', 'ir'] as const)
             .filter((k) => e.preset[k]?.enabled && !e.assetReady(k))
             .map((k) => (
               <p className="warning" key={k}>
-                {k.toUpperCase()} 파일을 다시 선택하세요 · {e.preset[k]?.name}
+                <span>
+                  {k === 'nam'
+                    ? 'NAM 라이브러리에서 모델을 적용하거나 원본을 다시 연결하세요'
+                    : 'IR 파일을 다시 선택하세요'}{' '}
+                  · {e.preset[k]?.name}
+                </span>
+                {k === 'nam' && (current.path === 'rig' || current.path === 'sandbox') && (
+                  <a href="#nam-library-button">모델 라이브러리로 이동</a>
+                )}
               </p>
             ))}
           <Routes>
@@ -245,7 +256,11 @@ function Workspace() {
           <span>
             SR <b>{e.ctx ? e.ctx.sampleRate / 1000 + ' kHz' : '—'}</b>
           </span>
-          <button onClick={() => open('input')}>
+          <button
+            aria-haspopup="dialog"
+            aria-label={'입력 설정 · ' + sourceNames[e.source]}
+            onClick={() => open('input')}
+          >
             <SlidersHorizontal />
             {sourceNames[e.source]}
           </button>
@@ -262,8 +277,12 @@ function Workspace() {
       {dialog === 'input' && (
         <Modal title="오디오 입력" close={() => open(null)}>
           <div className="dialog-body">
-            <InputControls />
-            {e.errors[0] && <p className="error">{e.errors[0]}</p>}
+            <InputControls inDialog />
+            {e.errors[0] && dismissed !== e.errors && (
+              <p className="error" role="alert">
+                {e.errors[0]}
+              </p>
+            )}
           </div>
         </Modal>
       )}

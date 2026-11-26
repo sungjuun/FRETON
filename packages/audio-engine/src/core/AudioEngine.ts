@@ -1,4 +1,4 @@
-import { DspGraph, smooth } from '../effects/graph'
+import { DspGraph, registerNoiseGate, smooth } from '../effects/graph'
 import { factoryPresets, dbToGain, type Preset } from '../presets/config'
 import { signalBuffer, type Signal, type Source } from '../inputs/signals'
 import { TestSignalInput } from '../inputs/TestSignalInput'
@@ -43,6 +43,7 @@ export class AudioEngine extends EventTarget {
   fileSize = 0
   file?: FileInput
   live?: LiveInput
+  livePending = false
   irBuffer?: AudioBuffer
   irInfo?: IRInfo
   namInfo?: NamInfo
@@ -84,7 +85,20 @@ export class AudioEngine extends EventTarget {
       this.ctx = ctx
       ctx.onstatechange = this.changed
       await ctx.resume()
-      this.graph = new DspGraph(ctx, this.preset.settings, this.preset.order)
+      let gateRegistered = false
+      try {
+        await registerNoiseGate(ctx)
+        gateRegistered = true
+      } catch {
+        this.report('Noise Gate를 준비할 수 없어 게이트를 우회합니다. 엔진을 재시작하세요.')
+      }
+      this.graph = new DspGraph(
+        ctx,
+        this.preset.settings,
+        this.preset.order,
+        gateRegistered,
+        this.report,
+      )
       this.inputGain = ctx.createGain()
       this.inputGain.gain.value = dbToGain(this.level)
       this.inputMeter = ctx.createAnalyser()
@@ -153,6 +167,7 @@ export class AudioEngine extends EventTarget {
   }
   private detachInput() {
     this.liveRequest++
+    this.livePending = false
     this.input?.disconnect()
     this.input = undefined
     this.file = undefined
@@ -227,28 +242,29 @@ export class AudioEngine extends EventTarget {
     const ctx = this.running()
     this.selectSource('live')
     this.detachInput()
+    const ticket = ++this.liveRequest
+    this.livePending = true
     this.sync()
-    const ticket = ++this.liveRequest,
-      stream = await requestInput(id)
-    if (
-      this.ctx !== ctx ||
-      !this.inputGain ||
-      this.source !== 'live' ||
-      ticket !== this.liveRequest
-    ) {
-      stream.getTracks().forEach((t) => t.stop())
-      return
-    }
+    let stream: MediaStream | undefined
     try {
+      stream = await requestInput(id)
+      if (ticket !== this.liveRequest || !this.inputGain) {
+        stream.getTracks().forEach((t) => t.stop())
+        return
+      }
       this.live = new LiveInput(ctx, stream, this.inputGain, () => {
         this.removeLive()
         this.report('입력 장치 연결이 해제되었습니다.')
       })
       this.input = this.live
-      this.changed()
     } catch (e) {
-      stream.getTracks().forEach((t) => t.stop())
-      throw e
+      stream?.getTracks().forEach((t) => t.stop())
+      if (ticket === this.liveRequest) throw e
+    } finally {
+      if (ticket === this.liveRequest) {
+        this.livePending = false
+        this.changed()
+      }
     }
   }
   removeLive() {
@@ -338,7 +354,10 @@ export class AudioEngine extends EventTarget {
     )
     this.changed()
   }
-  async loadNam(file: File, restore = false) {
+  async loadNam(
+    source: File | { name: string; sha256: string; readFile: () => Promise<File> },
+    restore = false,
+  ) {
     this.running()
     const slot = this.namSlot!
     const original = this.preset
@@ -354,10 +373,12 @@ export class AudioEngine extends EventTarget {
     try {
       await this.enqueue(async () => {
         if (!current()) return
-        const candidate = await slot.prepare(
-          file,
-          restore ? (original.nam ?? undefined) : undefined,
-        )
+        const expected = restore ? (original.nam ?? undefined) : undefined
+        const stored = 'readFile' in source
+        if (stored) verifyRestore(expected, source)
+        const file = stored ? await source.readFile() : source
+        if (!current()) return
+        const candidate = await slot.prepare(file, stored ? source : expected)
         if (!current()) {
           await candidate.discard()
           return

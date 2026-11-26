@@ -5,12 +5,15 @@ import { useEngine } from '../studio'
 import { Modal } from './Controls'
 
 const shortNames: Record<ChainStage, string> = {
+  noiseGate: 'GATE',
   compressor: 'COMP',
   overdrive: 'OD',
   distortion: 'DIST',
   nam: 'NAM',
   cabinet: 'IR',
   eq: 'EQ',
+  chorus: 'CHO',
+  tremolo: 'TRM',
   delay: 'DLY',
   reverb: 'REV',
 }

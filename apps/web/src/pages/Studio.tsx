@@ -23,6 +23,7 @@ import {
   factoryPresets,
   engineSampleRates,
   wav,
+  type AudioEngine,
   type ModuleId,
 } from '@freton/audio-engine'
 import { AmpHead, AmpKnob, RigPedal } from '../components/RigHardware'
@@ -152,6 +153,16 @@ function OutputControls() {
     </div>
   )
 }
+function ampPath(e: AudioEngine) {
+  if (e.busy) return '엔진 전환 중'
+  if (!e.ctx) return '엔진 대기'
+  if (e.ctx.state !== 'running') return '엔진 일시정지'
+  if (e.bypassed) return '원음 · 전체 Bypass'
+  if (e.dry) return '원음 · Dry'
+  if (e.preset.nam?.enabled)
+    return e.assetReady('nam') ? 'NAM · ' + e.preset.nam.name : '기본 DSP · NAM 미연결'
+  return '기본 DSP'
+}
 export function Rig() {
   const e = useEngine(),
     { open } = useStudio()
@@ -209,9 +220,9 @@ export function Rig() {
               </AmpHead>
             </div>
             <div className="amp-foot">
-              <span>
+              <span role="status" aria-label="앰프 신호 경로">
                 <i className="dot gold" />
-                {e.preset.nam?.enabled && e.assetReady('nam') ? 'NAM 캡처' : 'DSP 검증용 톤'}
+                {ampPath(e)}
               </span>
               <AB />
               <Bypass />
@@ -224,7 +235,12 @@ export function Rig() {
                 <Activity />
                 입출력 모니터
               </h2>
-              <button className="text-button" onClick={() => open('input')}>
+              <button
+                className="text-button"
+                aria-haspopup="dialog"
+                aria-label={'입력 설정 · ' + sourceNames[e.source]}
+                onClick={() => open('input')}
+              >
                 <Cable />
                 {sourceNames[e.source]}
                 <Settings2 />
@@ -290,6 +306,7 @@ export function Sandbox() {
                     key={String(d)}
                     disabled={
                       !e.ctx ||
+                      e.busy ||
                       rendering ||
                       e.source === 'live' ||
                       (!d && !e.bypassed && !e.dry && e.preset.nam?.enabled)

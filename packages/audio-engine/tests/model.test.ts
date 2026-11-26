@@ -67,7 +67,8 @@ describe('버전이 지정된 로컬 파일', () => {
   )
   it('다른 스키마, 잘못된 파라미터 및 참조를 거부한다', () => {
     const p = structuredClone(factoryPresets[0])
-    expect(() => parsePreset({ ...p, version: 3 })).toThrow()
+    for (const version of [0, 4.5, 6, '5', NaN])
+      expect(() => parsePreset({ ...p, version })).toThrow()
     expect(() => parsePreset({ ...p, ir: { name: 1, enabled: true } })).toThrow()
     p.settings.delay.values.feedback = 100
     expect(() => parsePreset(p)).toThrow()
@@ -82,11 +83,99 @@ describe('버전이 지정된 로컬 파일', () => {
       ir: { name: 'cab.wav', enabled: true },
     }
     const migrated = parsePreset(legacy)
-    expect(migrated).toEqual({ ...legacy, version: 2, order: defaultOrder })
+    expect(migrated).toEqual({ ...legacy, version: 5, order: defaultOrder })
     expect(migrated.order).not.toBe(order)
     expect(legacy).not.toHaveProperty('order')
   })
-  it('v2는 중복, 누락, 고정 단과 알 수 없는 슬롯을 거부한다', () => {
+  it('v2의 사용자 순서를 유지하고 우회된 게이트를 앞에 추가한다', () => {
+    const preset = factoryPresets[2]
+    const { noiseGate, ...settings } = preset.settings
+    const order = [...defaultOrder]
+      .filter((id) => id !== 'noiseGate' && id !== 'chorus' && id !== 'tremolo')
+      .reverse()
+    const legacy = { ...preset, version: 2, settings, order }
+    const migrated = parsePreset(legacy)
+    expect(migrated).toEqual({
+      ...preset,
+      order: [
+        'noiseGate',
+        'reverb',
+        'chorus',
+        'tremolo',
+        'delay',
+        'eq',
+        'cabinet',
+        'nam',
+        'distortion',
+        'overdrive',
+        'compressor',
+      ],
+    })
+    expect(migrated.settings.noiseGate.enabled).toBe(false)
+    expect(() => parsePreset({ ...legacy, order: ['noiseGate', ...order] })).toThrow('체인 순서')
+    expect(() => parsePreset({ ...preset, settings })).toThrow()
+    expect(() =>
+      parsePreset({
+        ...preset,
+        settings: {
+          ...settings,
+          noiseGate: { ...noiseGate, values: { ...noiseGate.values, threshold: 0 } },
+        },
+      }),
+    ).toThrow('범위')
+  })
+  it('v3에서 게이트 설정과 사용자 순서를 유지하고 Delay 앞에 꺼진 Chorus를 추가한다', () => {
+    const p = structuredClone(factoryPresets[3])
+    p.settings.noiseGate.enabled = true
+    p.settings.noiseGate.values.hold = 85
+    const { chorus, ...settings } = p.settings
+    const legacyOrder = [
+      'delay',
+      'nam',
+      'compressor',
+      'noiseGate',
+      'cabinet',
+      'distortion',
+      'overdrive',
+      'eq',
+      'reverb',
+    ]
+    const migrated = parsePreset({ ...p, version: 3, order: legacyOrder, settings })
+    expect(migrated).toEqual({ ...p, order: ['chorus', 'tremolo', ...legacyOrder] })
+    expect(migrated.settings.chorus.enabled).toBe(false)
+    expect(() => parsePreset({ ...migrated, settings })).toThrow()
+    expect(() => parsePreset({ ...migrated, version: 3 })).toThrow('체인 순서')
+    const values = { ...chorus.values, rate: 2.4, depth: 7.5, mix: 72 }
+    const custom = { ...migrated, settings: { ...settings, chorus: { enabled: true, values } } }
+    expect(parsePreset(JSON.parse(JSON.stringify(custom)))).toEqual(custom)
+    expect(() =>
+      parsePreset({
+        ...custom,
+        settings: { ...settings, chorus: { enabled: true, values: { ...values, depth: 9 } } },
+      }),
+    ).toThrow('범위')
+  })
+  it('v4의 페달 순서·코러스 설정을 보존하고 꺼진 Tremolo를 Delay 바로 앞에 넣는다', () => {
+    const preset = structuredClone(factoryPresets[3])
+    preset.settings.chorus = { enabled: true, values: { rate: 2, depth: 7, mix: 65 } }
+    const { tremolo, ...settings } = preset.settings
+    const oldOrder = [...defaultOrder].filter((id) => id !== 'tremolo').reverse()
+    const migrated = parsePreset({ ...preset, settings, order: oldOrder, version: 4 })
+    expect(migrated.order.filter((id) => id !== 'tremolo')).toEqual(oldOrder)
+    expect(migrated.order.indexOf('tremolo')).toBe(migrated.order.indexOf('delay') - 1)
+    expect(migrated.settings).toEqual(preset.settings)
+    expect(tremolo.enabled).toBe(false)
+    expect(() => parsePreset({ ...migrated, settings })).toThrow('누락')
+    expect(() => parsePreset({ ...migrated, version: 4 })).toThrow('체인 순서')
+    for (const values of [
+      { rate: 0.1, depth: 50 },
+      { rate: 4, depth: 101 },
+    ])
+      expect(() =>
+        parsePreset({ ...migrated, settings: { ...settings, tremolo: { enabled: true, values } } }),
+      ).toThrow('범위')
+  })
+  it('v5는 중복, 누락, 고정 단과 알 수 없는 슬롯을 거부한다', () => {
     const rest = defaultOrder.slice(1)
     for (const order of [
       undefined,

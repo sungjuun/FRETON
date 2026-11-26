@@ -31,6 +31,8 @@ Settings의 엔진 샘플레이트에서 출력 장치 기본값, 44.1, 48, 96 k
 
 ## 장비 없는 검증용 모델
 
+Virtual Rig와 Audio Sandbox에서 **NAM 모델 라이브러리**를 열면 엔진 시작 전에도 로컬 .nam을 검사하고 보관할 수 있다. 목록의 구조·레이트·캡처 유형은 파일에서 읽은 값이다. 엔진을 시작하고 **모델 적용**을 눌렀을 때 지문과 실제 레이트를 다시 검사하고 Worklet에서 모델을 로드한다. 엔진을 중지하거나 프리셋을 바꾸면 진행 중이던 라이브러리 읽기의 늦은 결과를 폐기한다. [저장·복원 방식](../adr/0008-local-nam-library.md)
+
 RiffSmith Distorted는 Matt Hartman이 학습한 48 kHz 앰프·캐비닛 캡처다. 저장소의 고정 버전과 지문을 기록하고 개발 앱 및 빌드본의 Worklet에서 활성화했다. Chrome 개발 앱에서 750 Hz WAV를 처리하여 3차 고조파와 바이패스 복귀를 측정했다. [캡처·원본 출처·MIT 고지](../../assets/test-audio/riffsmith/README.md) · [측정 결과](../testing/software-test.md)
 
 공식 코어의 `Linear`는 FIR 계수와 바이어스를 읽는다. 다음은 직접 정한 단일 계수로 구성한 기술 검증용 JSON이다. `sample_rate`에는 검사할 컨텍스트 값을 넣는다. 모델 교체 시 0.25를 0.5로 바꾸면 충분히 안정된 사인파의 RMS 비율이 약 2배가 되는지 비교할 수 있다. 같은 레벨의 Dry/Wet을 비교할 때는 다른 이펙터와 캐비닛 IR을 먼저 우회한다. Worklet의 초기 페이드와 10 Hz DC 차단 필터가 적용되므로 첫 몇 프레임의 값은 판정에서 제외한다. [Linear 구조](https://github.com/sdatkinson/NeuralAmpModelerCore/blob/v0.5.4/NAM/linear.cpp) · [Worklet 구현](https://github.com/tone-3000/neural-amp-modeler-wasm/blob/main/ui/src/engine/nam-worklet.ts)

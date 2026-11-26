@@ -22,6 +22,16 @@ export const modules = {
     color: '#8b99a0',
     params: { gain: range('Gain', -24, 18, 0.5, 0, 'dB') },
   },
+  noiseGate: {
+    label: 'Noise Gate',
+    color: '#85926a',
+    params: {
+      threshold: range('Threshold', -80, -10, 1, -48, 'dBFS'),
+      attack: range('Attack', 0.5, 40, 0.5, 2, 'ms'),
+      hold: range('Hold', 0, 250, 1, 40, 'ms'),
+      release: range('Release', 10, 800, 1, 120, 'ms'),
+    },
+  },
   compressor: {
     label: 'Compressor',
     color: '#547e80',
@@ -60,6 +70,23 @@ export const modules = {
       treble: range('Treble', -12, 12, 0.5, 0, 'dB'),
     },
   },
+  chorus: {
+    label: 'Chorus',
+    color: '#568798',
+    params: {
+      rate: range('Rate', 0.1, 5, 0.1, 0.8, 'Hz'),
+      depth: range('Depth', 0, 8, 0.1, 3.5, 'ms'),
+      mix: range('Mix', 0, 100, 1, 35, '%'),
+    },
+  },
+  tremolo: {
+    label: 'Tremolo',
+    color: '#a26c85',
+    params: {
+      rate: range('Rate', 0.5, 12, 0.1, 4, 'Hz'),
+      depth: range('Depth', 0, 100, 1, 50, '%'),
+    },
+  },
   delay: {
     label: 'Delay',
     color: '#77759d',
@@ -79,12 +106,15 @@ export type ModuleId = keyof typeof modules
 export const moduleIds = Object.keys(modules) as ModuleId[]
 export type ChainStage = Exclude<ModuleId, 'input'> | 'nam' | 'cabinet'
 export const defaultOrder: readonly ChainStage[] = [
+  'noiseGate',
   'compressor',
   'overdrive',
   'distortion',
   'nam',
   'cabinet',
   'eq',
+  'chorus',
+  'tremolo',
   'delay',
   'reverb',
 ]
@@ -104,8 +134,10 @@ export type AssetRef = {
   sha256?: string
   capture?: 'amp' | 'full' | 'unknown'
 }
+const presetVersion = 5
+const introducedIn: Partial<Record<ModuleId, number>> = { noiseGate: 3, chorus: 4, tremolo: 5 }
 export interface Preset {
-  version: 2
+  version: typeof presetVersion
   id: string
   name: string
   favorite: boolean
@@ -143,7 +175,7 @@ function makePreset(
     }
   }
   return {
-    version: 2,
+    version: presetVersion,
     id,
     name,
     favorite: false,
@@ -192,17 +224,27 @@ export function validParameter(id: ModuleId, key: string, value: unknown): value
 export function parsePreset(value: unknown): Preset {
   if (
     !record(value) ||
-    (value.version !== 1 && value.version !== 2) ||
+    typeof value.version !== 'number' ||
+    !Number.isInteger(value.version) ||
+    value.version < 1 ||
+    value.version > presetVersion ||
     !validName(value.name) ||
     !validName(value.id) ||
     typeof value.favorite !== 'boolean' ||
     !record(value.settings)
   )
     throw Error('지원하지 않는 프리셋 형식 또는 버전입니다.')
-  const order = value.version === 1 ? defaultOrder : value.order
+  let order = value.version === 1 ? defaultOrder : value.order
+  if (value.version === 2 && Array.isArray(order)) order = ['noiseGate', ...order]
+  if (value.version >= 2 && value.version < 5 && Array.isArray(order)) {
+    const delayIndex = order.indexOf('delay')
+    const newStages = value.version < 4 ? ['chorus', 'tremolo'] : ['tremolo']
+    order = [...order.slice(0, delayIndex), ...newStages, ...order.slice(delayIndex)]
+  }
   assertChainOrder(order)
   const settings = defaults()
   for (const id of moduleIds) {
+    if (value.version < (introducedIn[id] ?? 1)) continue
     const module = value.settings[id]
     if (!record(module) || typeof module.enabled !== 'boolean' || !record(module.values))
       throw Error('이펙터 설정이 누락되었습니다.')
@@ -228,7 +270,7 @@ export function parsePreset(value: unknown): Preset {
     return { name: v.name, enabled: v.enabled, capture, sha256: v.sha256 }
   }
   return {
-    version: 2,
+    version: presetVersion,
     id: value.id,
     name: value.name.trim(),
     favorite: value.favorite,

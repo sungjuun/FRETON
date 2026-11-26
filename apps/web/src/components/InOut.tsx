@@ -71,17 +71,18 @@ export function LiveControls() {
         disabled={!e.ctx || e.busy}
         onClick={() =>
           execute(async () => {
-            if (e.live) e.removeLive()
+            if (e.live || e.livePending) e.removeLive()
             else {
               await e.connectLive(id)
-              await refresh()
+              if (e.live) await refresh()
             }
           })
         }
       >
         <Cable />
-        {e.live ? '연결 해제' : '입력 연결'}
+        {e.livePending ? '연결 요청 취소' : e.live ? '연결 해제' : '입력 연결'}
       </button>
+      {e.livePending && <small role="status">브라우저의 입력 장치 응답을 기다리는 중입니다.</small>}
       {e.live && (
         <>
           <label>
@@ -128,7 +129,7 @@ export function LiveControls() {
         출력 장치
         <select
           aria-label="출력 장치"
-          disabled={!e.ctx || !('setSinkId' in e.ctx)}
+          disabled={!e.ctx || e.busy || !('setSinkId' in e.ctx)}
           value={e.sink}
           onChange={(ev) => execute(() => e.setOutput(ev.target.value))}
         >
@@ -174,7 +175,7 @@ function FileWave({ buffer }: { buffer: AudioBuffer }) {
     <canvas ref={ref} aria-label="선택 파일 파형" className="file-wave" width={640} height={48} />
   )
 }
-export function InputControls() {
+export function InputControls({ inDialog = false }: { inDialog?: boolean }) {
   const e = useEngine(),
     [pos, setPos] = useState(0)
   useEffect(() => {
@@ -240,11 +241,12 @@ export function InputControls() {
           onDrop={(ev) => {
             ev.preventDefault()
             const f = ev.dataTransfer.files[0]
-            if (f) execute(() => e.loadFile(f))
+            if (f && e.ctx && !e.busy) execute(() => e.loadFile(f))
           }}
         >
           <FilePick
             label="오디오 파일 선택"
+            disabled={!e.ctx || e.busy}
             accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a"
             onFile={(f) => execute(() => e.loadFile(f))}
           />
@@ -309,7 +311,14 @@ export function InputControls() {
         unit="dB"
         change={(v) => e.setLevel(v)}
       />
-      {!e.ctx && <p className="note">상단의 엔진 시작을 눌러 입력을 사용하세요.</p>}
+      {!e.ctx &&
+        (inDialog ? (
+          <button className="primary" disabled={e.busy} onClick={() => execute(() => e.start())}>
+            엔진 시작
+          </button>
+        ) : (
+          <p className="note">상단의 엔진 시작을 눌러 입력을 사용하세요.</p>
+        ))}
     </div>
   )
 }

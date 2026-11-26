@@ -133,8 +133,8 @@ export function PresetManager() {
           </button>
         </div>
         <p className="note">
-          기본 프리셋은 새 사용자 프리셋으로 저장됩니다. NAM·IR 파일은 이름과 지문만 저장하므로 새
-          세션에서는 다시 선택하세요.
+          기본 프리셋은 새 사용자 프리셋으로 저장됩니다. 새 세션에서는 NAM 모델 라이브러리에서
+          저장한 모델을 적용하거나 원본 파일을 다시 연결하세요. IR은 원본 WAV를 다시 선택하세요.
         </p>
         <p role="status">{message}</p>
         {e.errors[0] && <p className="error">{e.errors[0]}</p>}

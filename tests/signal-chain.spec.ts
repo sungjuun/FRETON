@@ -1,14 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
-import { readFile } from 'node:fs/promises'
 import { defaultOrder, factoryPresets } from '../packages/audio-engine/src/presets/config'
 import type { AudioEngine } from '../packages/audio-engine/src/core/AudioEngine'
-import { audioWav } from './audio-wav'
+import { audioWav, downloadFile } from './audio-wav'
 
-async function downloadFile(page: Page, label: string) {
-  const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: label, exact: true }).click()
-  return readFile((await (await download).path())!)
-}
 async function levels(page: Page) {
   const live = await page.evaluate(async () => {
     const e: AudioEngine = (await import(/* @vite-ignore */ '/src/studio.ts' as string)).engine
@@ -54,7 +48,7 @@ test('재생 중 순서 변경과 복원이 실시간 신호와 Wet WAV에 동�
       .getByRole('listitem')
       .filter({ has: page.getByRole('button', { name: label + ' 앞으로' }) })
   await row('Equalizer').dragTo(row('Distortion'))
-  await expect(editor.getByRole('status')).toHaveText('Equalizer · 3번째')
+  await expect(editor.getByRole('status')).toHaveText('Equalizer · 4번째')
   await editor.getByRole('button', { name: '닫기' }).click()
   const after = await levels(page)
   expect(before.live / after.live).toBeGreaterThan(2)
@@ -108,11 +102,25 @@ test('기존 IndexedDB 프리셋을 열고 순서를 키보드로 편집·저장
   await page.reload()
   await page.getByLabel('현재 프리셋', { exact: true }).selectOption('legacy-rig')
   const route = page.getByRole('list', { name: '현재 신호 순서' }).getByRole('listitem')
-  const expected = ['IN', 'COMP', 'OD', 'DIST', 'NAM', 'IR', 'EQ', 'DLY', 'REV', 'OUT']
+  const expected = [
+    'IN',
+    'GATE',
+    'COMP',
+    'OD',
+    'DIST',
+    'NAM',
+    'IR',
+    'EQ',
+    'CHO',
+    'TRM',
+    'DLY',
+    'REV',
+    'OUT',
+  ]
   await expect(route).toHaveText(expected)
   await page.getByRole('button', { name: '순서 편집' }).click()
   const dialog = page.getByRole('dialog')
-  await expect(dialog.getByRole('button', { name: 'Compressor 앞으로' })).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: 'Noise Gate 앞으로' })).toBeDisabled()
   await expect(dialog.getByRole('button', { name: 'Reverb 뒤로' })).toBeDisabled()
   await dialog.getByRole('button', { name: 'Cabinet IR 앞으로' }).press('Enter')
   await dialog.getByRole('button', { name: '닫기' }).click()
@@ -121,15 +129,15 @@ test('기존 IndexedDB 프리셋을 열고 순서를 키보드로 편집·저장
   await expect(dialog.getByRole('status')).toContainText('저장했습니다')
   const json = await downloadFile(page, 'JSON 내보내기')
   const order = [...defaultOrder]
-  order.splice(3, 2, 'cabinet', 'nam')
+  order.splice(order.indexOf('nam'), 2, 'cabinet', 'nam')
   expect(JSON.parse(json.toString())).toMatchObject({
-    version: 2,
+    version: 5,
     order,
     settings: legacy.settings,
   })
   await page.reload()
   await page.getByLabel('현재 프리셋', { exact: true }).selectOption('legacy-rig')
-  expected.splice(4, 2, 'IR', 'NAM')
+  expected.splice(expected.indexOf('NAM'), 2, 'IR', 'NAM')
   await expect(route).toHaveText(expected)
   await page.getByRole('button', { name: '프리셋 관리' }).click()
   await dialog
@@ -141,5 +149,5 @@ test('기존 IndexedDB 프리셋을 열고 순서를 키보드로 편집·저장
   await page.getByRole('button', { name: '순서 편집' }).click()
   await dialog.getByRole('button', { name: '기본 순서' }).click()
   await dialog.press('Escape')
-  await expect(route.nth(4)).toHaveText('NAM')
+  await expect(route.nth(5)).toHaveText('NAM')
 })

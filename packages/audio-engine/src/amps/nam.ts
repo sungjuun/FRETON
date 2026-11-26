@@ -10,8 +10,13 @@ export interface NamInfo {
   architecture: string
   capture: NonNullable<AssetRef['capture']>
 }
-export function validateNam(raw: string, rate: number) {
-  const model = JSON.parse(raw)
+export function validateNam(raw: string, rate?: number) {
+  let model
+  try {
+    model = JSON.parse(raw)
+  } catch {
+    throw Error('NAM 파일의 JSON 형식이 올바르지 않습니다.')
+  }
   if (
     !model ||
     typeof model.version !== 'string' ||
@@ -33,7 +38,8 @@ export function validateNam(raw: string, rate: number) {
     throw Error('Linear NAM 계수의 수가 설정과 일치하지 않습니다.')
   if (!Number.isFinite(model.sample_rate) || model.sample_rate <= 0)
     throw Error('모델의 요구 샘플레이트를 확인할 수 없습니다.')
-  if (model.sample_rate !== rate)
+  const sampleRate: number = model.sample_rate
+  if (rate !== undefined && sampleRate !== rate)
     throw Error(
       'NAM ' +
         model.sample_rate +
@@ -44,7 +50,19 @@ export function validateNam(raw: string, rate: number) {
   const type = model.metadata?.gear_type
   const capture: NamInfo['capture'] =
     type === 'amp_cab' || type === 'amp_pedal_cab' ? 'full' : type === 'amp' ? 'amp' : 'unknown'
-  return { sampleRate: rate, architecture: String(model.architecture), capture }
+  return { sampleRate, architecture: String(model.architecture), capture }
+}
+export async function readNamFile(file: File, rate?: number) {
+  if (!/\.nam$/i.test(file.name) || file.size > 32 * 1024 ** 2)
+    throw Error('32 MiB 이하의 .nam 파일을 선택하세요.')
+  const bytes = await file.arrayBuffer(),
+    raw = new TextDecoder().decode(bytes)
+  const info: NamInfo = {
+    ...validateNam(raw, rate),
+    name: file.name,
+    sha256: await fingerprint(bytes),
+  }
+  return { raw, info }
 }
 // A failed worklet cannot acknowledge messages. Bound the wait so the native rig can stop.
 async function reply<T>(operation: Promise<T>, node?: NamNode): Promise<T> {
@@ -78,16 +96,8 @@ export class NamSlot {
     private path: SwitchPath,
     private failed: () => void,
   ) {}
-  async prepare(file: File, expected?: AssetRef) {
-    if (!/\.nam$/i.test(file.name) || file.size > 32 * 1024 ** 2)
-      throw Error('32 MiB 이하의 .nam 파일을 선택하세요.')
-    const bytes = await file.arrayBuffer(),
-      raw = new TextDecoder().decode(bytes)
-    const info: NamInfo = {
-      ...validateNam(raw, this.ctx.sampleRate),
-      name: file.name,
-      sha256: await fingerprint(bytes),
-    }
+  async prepare(file: File, expected?: Pick<AssetRef, 'name' | 'sha256'>) {
+    const { raw, info } = await readNamFile(file, this.ctx.sampleRate)
     verifyRestore(expected, info)
     const { NamEngine } = await import('neural-amp-modeler-wasm/engine')
     const engine = await reply(NamEngine.attach(this.ctx)),
