@@ -50,6 +50,8 @@ RiffSmith Distorted는 Matt Hartman이 학습한 48 kHz 앰프·캐비닛 캡처
 
 이 검사는 로딩과 신호 처리를 판정한다. 실제 앰프 캡처의 음질·연주감·장시간 성능은 모델과 실기기로 별도 확인한다. 실행 결과는 [소프트웨어 테스트 기록](../testing/software-test.md)과 [하드웨어 테스트 기록](../testing/hardware-test.md)을 따른다.
 
+`npm run bench:nam`은 프로덕션 빌드의 같은 오디오 그래프에서 NAM 미연결, Linear, RiffSmith를 비교한다. 요구 레이트가 다른 학습 캡처는 로드 거부를 확인하고 호환되는 조합만 측정한다. [모델별 처리 시간과 재현 방법](../testing/nam-performance.md)
+
 ## 라이선스
 
 TONE3000의 WASM 패키지 3.3.0과 Steven Atkinson의 NeuralAmpModelerCore v0.5.4는 각각 MIT 라이선스로 배포된다. 바이너리를 배포할 때 저작권 고지와 허가문을 함께 보존한다. npm에 포함된 엔진 자산과 GitHub 데모 라이브러리는 배포 경로도 다르다. 데모 모델을 복사할 경우 파일별 제작자·원본·상업적 사용 및 재배포 조건을 확인해야 한다. FRETON의 한 계수 예제는 직접 구성했으며 학습 데이터나 외부 캡처의 가중치를 포함하지 않는다. [WASM 라이선스](https://github.com/tone-3000/neural-amp-modeler-wasm/blob/main/LICENSE) · [코어 라이선스](https://github.com/sdatkinson/NeuralAmpModelerCore/blob/v0.5.4/LICENSE) · [데모 모델과 기여자](https://github.com/tone-3000/neural-amp-modeler-wasm/blob/main/ui/public/models/README.md)

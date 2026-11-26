@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:browser": "playwright test",
     "test:production": "npm run build && playwright test -c playwright.production.config.ts",
+    "bench:nam": "npm run build && playwright test -c playwright.nam-benchmark.config.ts",
     "fixtures": "node scripts/create-fixtures.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",

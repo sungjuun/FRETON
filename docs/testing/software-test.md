@@ -1,6 +1,6 @@
 # 소프트웨어 검증
 
-2026-11-25~26, Windows · Node.js 22.23.2 · npm 10.9.8 · 설치된 Google Chrome 158.0.8127.37에서 수행했다. 실제 오디오 인터페이스, 마이크, 일렉기타는 사용하지 않았다.
+2026-11-25~27, Windows · Node.js 22.23.2 · npm 10.9.8 · 설치된 Google Chrome 158.0.8127.37에서 수행했다. 실제 오디오 인터페이스, 마이크, 일렉기타는 사용하지 않았다.
 
 ## 재현 명령
 
@@ -15,6 +15,8 @@
 | `npm run build`                                          | 타입 검사 및 Vite 정적 산출물                                                                                                | 통과               |
 | `npm run test:production`                                | 빌드본 새로고침, Chorus·Tremolo WAV, 해시된 Worklet·WASM, 직접 연 Linear에서 라이브러리의 RiffSmith 모델로 교체 및 엔진 종료 | 1개 통과           |
 | `npm run fixtures -- 44100`, `npm run fixtures -- 48000` | 자체 검증 WAV·IR·NAM 생성                                                                                                    | 두 레이트에서 생성 |
+
+별도 성능 측정 명령 `npm run bench:nam`은 세 샘플레이트 모두에서 완료됐다. 프로덕션 앱의 실시간 재생을 기준으로 NAM 호환성과 7개 레이트·모델 조합의 렌더 시간을 기록했다. [측정 조건·결과·재현 방법](nam-performance.md)
 
 ## 실제 오프라인 오디오
 
